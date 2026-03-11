@@ -282,6 +282,10 @@ export function normalizeProviders(params: {
     exec?: string;
   };
   secretRefManagedProviders?: Set<string>;
+  /** Original (pre-resolution) provider configs from sourceConfig. Used to
+   *  detect SecretRef-managed apiKeys even when the passed providers carry
+   *  already-resolved plaintext values. */
+  sourceProviders?: Record<string, { apiKey?: unknown }>;
 }): ModelsConfig["providers"] {
   const { providers } = params;
   if (!providers) {
@@ -323,7 +327,25 @@ export function normalizeProviders(params: {
       env,
     });
 
-    if (configuredApiKeyRef && configuredApiKeyRef.id.trim()) {
+    // Check sourceProviders for the original (pre-resolution) apiKey value.
+    // When the caller passes already-resolved plaintext configs (e.g. because
+    // resolveModelsConfigInput() could not match by reference equality),
+    // sourceProviders still carries the original SecretRef objects.
+    const sourceApiKeyRef = params.sourceProviders
+      ? coerceSecretRef(params.sourceProviders[normalizedKey]?.apiKey, params.secretDefaults)
+      : null;
+
+    if (sourceApiKeyRef && sourceApiKeyRef.id.trim()) {
+      const marker =
+        sourceApiKeyRef.source === "env"
+          ? sourceApiKeyRef.id.trim()
+          : resolveNonEnvSecretRefApiKeyMarker(sourceApiKeyRef.source);
+      if (normalizedProvider.apiKey !== marker) {
+        mutated = true;
+        normalizedProvider = { ...normalizedProvider, apiKey: marker };
+      }
+      params.secretRefManagedProviders?.add(normalizedKey);
+    } else if (configuredApiKeyRef && configuredApiKeyRef.id.trim()) {
       const marker =
         configuredApiKeyRef.source === "env"
           ? configuredApiKeyRef.id.trim()

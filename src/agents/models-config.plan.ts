@@ -1,4 +1,4 @@
-import type { OpenClawConfig } from "../config/config.js";
+import { getRuntimeConfigSourceSnapshot, type OpenClawConfig } from "../config/config.js";
 import { isRecord } from "../utils.js";
 import {
   mergeProviders,
@@ -100,6 +100,12 @@ export async function planOpenClawModelsJson(params: {
 
   const mode = cfg.models?.mode ?? "merge";
   const secretRefManagedProviders = new Set<string>();
+  // Retrieve the original (pre-resolution) source config so we can detect
+  // SecretRef-managed apiKeys even when cfg carries resolved plaintext.
+  const sourceConfig = getRuntimeConfigSourceSnapshot();
+  const sourceProviders = sourceConfig?.models?.providers as
+    | Record<string, { apiKey?: unknown }>
+    | undefined;
   const normalizedProviders =
     normalizeProviders({
       providers,
@@ -107,6 +113,7 @@ export async function planOpenClawModelsJson(params: {
       env,
       secretDefaults: cfg.secrets?.defaults,
       secretRefManagedProviders,
+      sourceProviders,
     }) ?? providers;
   const mergedProviders = await resolveProvidersForMode({
     mode,
