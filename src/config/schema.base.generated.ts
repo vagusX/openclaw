@@ -216,6 +216,9 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
               },
             ],
           },
+          dir: {
+            type: "string",
+          },
           file: {
             type: "string",
           },
